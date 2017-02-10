@@ -6,7 +6,7 @@ import java.util.Locale;
 
 public class TimeUtil
 {
-	/** 获取UTC时间，按照指定格式输出 **/
+	/** 获取UTC时间，按照指定格式输出，例如：yyyy-MM-dd HH:mm:ss.SSS **/
 	public static String getUTCTime(String format)
 	{
 		// 取得本地时间
@@ -22,7 +22,7 @@ public class TimeUtil
 		return simpleDateFormat.format(calendar.getTime());
 	}
 	
-	/** 获取本地时间，按照指定格式输出 **/
+	/** 获取本地时间，按照指定格式输出，例如：yyyy-MM-dd HH:mm:ss.SSS **/
 	public static String getLocalTime(String format)
 	{
 		// 取得本地时间

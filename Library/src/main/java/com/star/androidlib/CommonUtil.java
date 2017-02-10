@@ -1,13 +1,13 @@
 package com.star.androidlib;
 
-import java.io.File;
-import java.util.Locale;
-
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Environment;
 import android.util.DisplayMetrics;
+
+import java.io.File;
+import java.util.Locale;
 
 public class CommonUtil
 {

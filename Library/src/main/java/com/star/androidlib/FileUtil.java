@@ -129,7 +129,7 @@ public class FileUtil
 	}
 	
 	/** 将文本写入文件中 **/
-	public static void WriteContentToFile(String strContent, String strFilePath, boolean isOverWrite, String strEncoding)
+	public static void writeContentToFile(String strContent, String strFilePath, boolean isOverWrite, String strEncoding)
 	{
 		try
 		{
