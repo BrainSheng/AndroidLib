@@ -2,9 +2,17 @@ package com.star.androidlib;
 
 import android.util.Log;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.Collator;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -15,26 +23,89 @@ public class LogUtil
     public static final int INFO = 2;
     public static final int WARN = 3;
     public static final int ERROR = 4;
-    public static final int OFF = 5;
 
-    private static int mLogLevel = OFF;
-    private static String mLogFileNamePrefix = "";
+    private static int mLevelConsole = DEBUG;
+    private static int mLevelFile = DEBUG;
+    private static long mMaxFileSize = 10 * 1024 * 1024;
+    private static int mMaxFileCount = 5;
     private static String mLogFilePath = "";
-    private static BlockingQueue<String> mLogQueue;
-    private static PrintWriter mFileWriter;
-    private static String mCurrentDate;
+    private static String mLogFileName = "";
+    private static boolean mIsConsoleEnabled = false;
+    private static boolean mIsFileEnabled = false;
 
-    /** 初始化Logger **/
-    public static void init(int level, String filePath, String fileNamePrefix)
+    private static BlockingQueue<String> mLogMsgQueue;
+    private static PrintWriter mLogFileWriter;
+    private static String currentLogDate;
+
+    /** 设置控制台日志级别 **/
+    public static void setLevelConsole(int level)
     {
-        mLogLevel = level;
-        mLogFilePath = filePath;
-        mLogFileNamePrefix = fileNamePrefix;
-        if (!StringUtil.isEmpty(filePath))
+        mLevelConsole = level;
+    }
+
+    /** 设置文件日志级别 **/
+    public static void setLevelFile(int level)
+    {
+        mLevelFile = level;
+    }
+
+    /** 设置日志路径 **/
+    public static void setLogPath(String path)
+    {
+        if (!StringUtil.isEmpty(path))
         {
+            // 统一把目录分隔符替换成/
+            mLogFilePath = path.replace("\\", "/");
+            // 结尾加上/
+            if (!mLogFilePath.endsWith("/"))
+            {
+                mLogFilePath = mLogFilePath + "/";
+            }
+            // 创建路径
             FileUtil.createAllDirectories(mLogFilePath);
-            enableOutputToFile();
         }
+    }
+
+    /** 允许输出日志到控制台 **/
+    public static void enableOutputToConsole()
+    {
+        mIsConsoleEnabled = true;
+    }
+
+    /** 允许输出日志到文件 **/
+    public static void enableOutputToFile()
+    {
+        mIsFileEnabled = true;
+        mLogMsgQueue = new LinkedBlockingQueue<>();
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    try
+                    {
+                        // 如果日志路径为空，则不输出日志到文件中，每隔1秒检查一次
+                        if (StringUtil.isEmpty(mLogFilePath))
+                        {
+                            CommonUtil.sleep(1000);
+                        }
+                        // 否则写入日志到文件中
+                        else
+                        {
+                            String content = mLogMsgQueue.take();
+                            checkFileWriter();
+                            mLogFileWriter.println(content);
+                            mLogFileWriter.flush();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                    }
+                }
+            }
+        }).start();
     }
 
     public static void verbose(String tag, String msg)
@@ -42,9 +113,9 @@ public class LogUtil
         log(VERBOSE, tag, msg);
     }
 
-    public static void verbose(String tag, String msg, Throwable throwable)
+    public static void verbose(String tag, String msg, Throwable tr)
     {
-        log(VERBOSE, tag, msg, throwable);
+        log(VERBOSE, tag, msg, tr);
     }
 
     public static void verbose(String msg)
@@ -52,9 +123,9 @@ public class LogUtil
         log(VERBOSE, msg);
     }
 
-    public static void verbose(String msg, Throwable throwable)
+    public static void verbose(String msg, Throwable tr)
     {
-        log(VERBOSE, msg, throwable);
+        log(VERBOSE, msg, tr);
     }
 
     public static void debug(String tag, String msg)
@@ -62,9 +133,9 @@ public class LogUtil
         log(DEBUG, tag, msg);
     }
 
-    public static void debug(String tag, String msg, Throwable throwable)
+    public static void debug(String tag, String msg, Throwable tr)
     {
-        log(DEBUG, tag, msg, throwable);
+        log(DEBUG, tag, msg, tr);
     }
 
     public static void debug(String msg)
@@ -72,9 +143,9 @@ public class LogUtil
         log(DEBUG, msg);
     }
 
-    public static void debug(String msg, Throwable throwable)
+    public static void debug(String msg, Throwable tr)
     {
-        log(DEBUG, msg, throwable);
+        log(DEBUG, msg, tr);
     }
 
     public static void info(String tag, String msg)
@@ -82,9 +153,9 @@ public class LogUtil
         log(INFO, tag, msg);
     }
 
-    public static void info(String tag, String msg, Throwable throwable)
+    public static void info(String tag, String msg, Throwable tr)
     {
-        log(INFO, tag, msg, throwable);
+        log(INFO, tag, msg, tr);
     }
 
     public static void info(String msg)
@@ -92,9 +163,9 @@ public class LogUtil
         log(INFO, msg);
     }
 
-    public static void info(String msg, Throwable throwable)
+    public static void info(String msg, Throwable tr)
     {
-        log(INFO, msg, throwable);
+        log(INFO, msg, tr);
     }
 
     public static void warn(String tag, String msg)
@@ -102,9 +173,9 @@ public class LogUtil
         log(WARN, tag, msg);
     }
 
-    public static void warn(String tag, String msg, Throwable throwable)
+    public static void warn(String tag, String msg, Throwable tr)
     {
-        log(WARN, tag, msg, throwable);
+        log(WARN, tag, msg, tr);
     }
 
     public static void warn(String msg)
@@ -112,9 +183,9 @@ public class LogUtil
         log(WARN, msg);
     }
 
-    public static void warn(String msg, Throwable throwable)
+    public static void warn(String msg, Throwable tr)
     {
-        log(WARN, msg, throwable);
+        log(WARN, msg, tr);
     }
 
     public static void error(String tag, String msg)
@@ -122,9 +193,9 @@ public class LogUtil
         log(ERROR, tag, msg);
     }
 
-    public static void error(String tag, String msg, Throwable throwable)
+    public static void error(String tag, String msg, Throwable tr)
     {
-        log(ERROR, tag, msg, throwable);
+        log(ERROR, tag, msg, tr);
     }
 
     public static void error(String msg)
@@ -132,15 +203,28 @@ public class LogUtil
         log(ERROR, msg);
     }
 
-    public static void error(String msg, Throwable throwable)
+    public static void error(String msg, Throwable tr)
     {
-        log(ERROR, msg, throwable);
+        log(ERROR, msg, tr);
     }
 
-    /** 判断指定日志级别是否生效 **/
-    private static boolean isLogLevelEnabled(int level)
+    /** 判断控制台日志级别是否生效 **/
+    private static boolean isConsoleLogLevelEnabled(int level)
     {
-        if (level >= mLogLevel)
+        if (mIsConsoleEnabled && level >= mLevelConsole)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    /** 判断文件日志级别是否生效 **/
+    private static boolean isFileLogLevelEnabled(int level)
+    {
+        if (mIsFileEnabled && level >= mLevelFile)
         {
             return true;
         }
@@ -176,9 +260,9 @@ public class LogUtil
     /** 输出日志 **/
     private static void log(int level, String tag, String msg)
     {
-        if (isLogLevelEnabled(level))
+        // 输出日志到控制台
+        if (isConsoleLogLevelEnabled(level))
         {
-            // 输出到Logcat中
             switch (level)
             {
             case VERBOSE:
@@ -197,40 +281,43 @@ public class LogUtil
                 Log.e(tag, msg);
                 break;
             }
-            // 输出到文件中
+        }
+        // 输出日志到文件
+        if (isFileLogLevelEnabled(level))
+        {
             String content = String.format("%s | %s | %s | %s", getCurrentTimeDesc(), getLogLevelDesc(level), tag, msg);
-            addLogToQueue(tag, content.trim());
+            addLogToQueue(content.trim());
         }
     }
 
-    private static void log(int level, String tag, String msg, Throwable throwable)
+    private static void log(int level, String tag, String msg, Throwable tr)
     {
-        if (isLogLevelEnabled(level))
+        // 输出日志到控制台
+        if (isConsoleLogLevelEnabled(level))
         {
-            // 输出到Logcat中
             switch (level)
             {
             case VERBOSE:
-                Log.v(tag, msg, throwable);
+                Log.v(tag, msg, tr);
                 break;
             case DEBUG:
-                Log.d(tag, msg, throwable);
+                Log.d(tag, msg, tr);
                 break;
             case INFO:
-                Log.i(tag, msg, throwable);
+                Log.i(tag, msg, tr);
                 break;
             case WARN:
-                Log.w(tag, msg, throwable);
+                Log.w(tag, msg, tr);
                 break;
             case ERROR:
-                Log.e(tag, msg, throwable);
+                Log.e(tag, msg, tr);
                 break;
             }
             // 输出到文件中
             String content = String.format("%s | %s | %s | %s", getCurrentTimeDesc(), getLogLevelDesc(level), tag, msg);
-            String trace = String.format("%s | %s | %s | %s", getCurrentTimeDesc(), getLogLevelDesc(level), tag, Log.getStackTraceString(throwable));
-            addLogToQueue(tag, content.trim());
-            addLogToQueue(tag, trace.trim());
+            String trace = String.format("%s | %s | %s | %s", getCurrentTimeDesc(), getLogLevelDesc(level), tag, Log.getStackTraceString(tr));
+            addLogToQueue(content.trim());
+            addLogToQueue(trace.trim());
         }
     }
 
@@ -239,18 +326,18 @@ public class LogUtil
         log(level, getTag(), msg);
     }
 
-    private static void log(int level, String msg, Throwable throwable)
+    private static void log(int level, String msg, Throwable tr)
     {
-        log(level, getTag(), msg, throwable);
+        log(level, getTag(), msg, tr);
     }
 
-    private static void addLogToQueue(String tag, String msg)
+    private static void addLogToQueue(String msg)
     {
-        if (mLogQueue != null)
+        if (mLogMsgQueue != null)
         {
             try
             {
-                mLogQueue.put(msg);
+                mLogMsgQueue.put(msg);
             }
             catch (InterruptedException e)
             {
@@ -261,7 +348,8 @@ public class LogUtil
     /** 获取当前系统时间 **/
     private static String getCurrentTimeDesc()
     {
-        return TimeUtil.getLocalTime("yyyy-MM-dd HH:mm:ss.SSS");
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault());
+        return simpleDateFormat.format(new Date());
     }
 
     /** 获取日志级别的描述 **/
@@ -272,75 +360,135 @@ public class LogUtil
         case VERBOSE:
             return "VERBOSE";
         case DEBUG:
-            return "DEBUG";
+            return "DEBUG  ";
         case INFO:
-            return "INFO";
+            return "INFO   ";
         case WARN:
-            return "WARN";
+            return "WARN   ";
         case ERROR:
-            return "ERROR";
+            return "ERROR  ";
         default:
             return "";
         }
     }
 
     /** 检查日志的输出文件是否需要切换 **/
-    private static void checkFileWriter(String content)
+    private static void checkFileWriter()
     {
-        // 截取日志每一行的前10位字符串，去除-，形成20170101的格式，比较日期是否变化
-        String date = content.substring(0, 10);
-        date.replaceAll("-", "");
-        // 如果日期变化了，需要切换日志文件
-        if (!date.equals(mCurrentDate))
+        try
         {
-            try
+            // 日志输出Writer为null，则需要新建一个Writer
+            if (mLogFileWriter == null)
             {
-                // 如果有当前正在写的文件，则关闭之
-                if (mFileWriter != null)
+                String filePathName = "";
+                // 如果日志目录下已经存在日志文件，则挑选最新的文件继续写入
+                if (getCurrLogFileCount() > 0)
                 {
-                    mFileWriter.close();
+                    mLogFileName = getNewestFileName();
+                    filePathName = getCurrentLogFilePathName();
                 }
-                // 打开新的文件进行写入
-                String filePath = mLogFilePath;
-                String fileName = String.format("%s.log", date);
-                // 判断文件名前缀是否为空，前缀为空，则文件名只包含日期时间
-                if (StringUtil.isEmpty(mLogFileNamePrefix))
+                else
                 {
-                    fileName = mLogFileNamePrefix + "_" + fileName;
+                    filePathName = generateNewLogFilePathName();
                 }
-                String filePathName = filePath + "/" + fileName;
-                mCurrentDate = date;
-                mFileWriter = new PrintWriter(new FileOutputStream(filePathName, true));
+                mLogFileWriter = new PrintWriter(new FileOutputStream(filePathName, true));
             }
-            catch (IOException e)
+            // 否则需要继续使用当前的Writer
+            else
             {
+                // 文件大小超过上限则新建一个文件继续输出
+                File file = new File(getCurrentLogFilePathName());
+                if (file.length() >= mMaxFileSize)
+                {
+                    mLogFileWriter.close();
+                    mLogFileWriter = new PrintWriter(new FileOutputStream(generateNewLogFilePathName(), true));
+                    // 文件数量超过上限则删除最老的文件
+                    if (getCurrLogFileCount() > mMaxFileCount)
+                    {
+                        new File(mLogFilePath + getOldestFileName()).delete();
+                    }
+                }
             }
+        }
+        catch (IOException e)
+        {
         }
     }
 
-    /** 启动写文件的线程 **/
-    private static void enableOutputToFile()
+    /** 获取当前文件全路径名称 **/
+    private static String getCurrentLogFilePathName()
     {
-        mLogQueue = new LinkedBlockingQueue<String>();
-        new Thread(new Runnable()
+        return mLogFilePath + mLogFileName;
+    }
+
+    /** 生成一个新的日志文件，并返回日志文件路径 **/
+    private static String generateNewLogFilePathName()
+    {
+        mLogFileName = TimeUtil.getLocalTime("yyyyMMdd_HHmmss_SSS") + ".log";
+        return mLogFilePath + mLogFileName;
+    }
+
+    /** 获取当前日志路径下的日志文件个数 **/
+    private static int getCurrLogFileCount()
+    {
+        File fPath = new File(mLogFilePath);
+        File[] fChildFiles = fPath.listFiles();
+        List<String> fileNameList = new ArrayList<>();
+        for (File f : fChildFiles)
         {
-            @Override
-            public void run()
+            if (f.getName().endsWith(".log"))
             {
-                while (true)
-                {
-                    try
-                    {
-                        String content = mLogQueue.take();
-                        checkFileWriter(content);
-                        mFileWriter.println(content);
-                        mFileWriter.flush();
-                    }
-                    catch (InterruptedException e)
-                    {
-                    }
-                }
+                fileNameList.add(f.getName());
             }
-        }).start();
+        }
+        return fileNameList.size();
+    }
+
+    /** 获取日志路径下最新的日志文件名称 **/
+    private static String getNewestFileName()
+    {
+        File fPath = new File(mLogFilePath);
+        File[] fChildFiles = fPath.listFiles();
+        List<String> fileNameList = new ArrayList<>();
+        for (File f : fChildFiles)
+        {
+            if (f.getName().endsWith(".log"))
+            {
+                fileNameList.add(f.getName());
+            }
+        }
+        if (fileNameList.size() > 0)
+        {
+            Collections.sort(fileNameList, Collator.getInstance());
+            return fileNameList.get(fileNameList.size() - 1);
+        }
+        else
+        {
+            return "";
+        }
+    }
+
+    /** 获取日志路径下最老的日志文件名称 **/
+    private static String getOldestFileName()
+    {
+        File fPath = new File(mLogFilePath);
+        File[] fChildFiles = fPath.listFiles();
+        List<String> fileNameList = new ArrayList<>();
+        for (File f : fChildFiles)
+        {
+            if (f.getName().endsWith(".log"))
+            {
+                fileNameList.add(f.getName());
+            }
+        }
+        if (fileNameList.size() > 0)
+        {
+            Collections.sort(fileNameList, Collator.getInstance());
+            return fileNameList.get(0);
+        }
+        else
+        {
+            return "";
+        }
     }
 }
