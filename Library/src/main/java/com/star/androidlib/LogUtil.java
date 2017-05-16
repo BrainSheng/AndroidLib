@@ -1,5 +1,6 @@
 package com.star.androidlib;
 
+import android.os.Process;
 import android.util.Log;
 
 import java.io.File;
@@ -47,6 +48,18 @@ public class LogUtil
     public static void setLevelFile(int level)
     {
         mLevelFile = level;
+    }
+
+    /** 设置单个日志文件最大大小，单位：字节 **/
+    public static void setMaxFileSize(long size)
+    {
+        mMaxFileSize = size;
+    }
+
+    /** 设置最大日志文件数量 **/
+    public static void setMaxFileCount(int count)
+    {
+        mMaxFileCount = count;
     }
 
     /** 设置日志路径 **/
@@ -285,8 +298,7 @@ public class LogUtil
         // 输出日志到文件
         if (isFileLogLevelEnabled(level))
         {
-            String content = String.format("%s | %s | %s | %s", getCurrentTimeDesc(), getLogLevelDesc(level), tag, msg);
-            addLogToQueue(content.trim());
+            addLogToQueue(getFileLogContent(level, tag, msg));
         }
     }
 
@@ -314,10 +326,8 @@ public class LogUtil
                 break;
             }
             // 输出到文件中
-            String content = String.format("%s | %s | %s | %s", getCurrentTimeDesc(), getLogLevelDesc(level), tag, msg);
-            String trace = String.format("%s | %s | %s | %s", getCurrentTimeDesc(), getLogLevelDesc(level), tag, Log.getStackTraceString(tr));
-            addLogToQueue(content.trim());
-            addLogToQueue(trace.trim());
+            addLogToQueue(getFileLogContent(level, tag, msg));
+            addLogToQueue(getFileLogContent(level, tag, Log.getStackTraceString(tr)));
         }
     }
 
@@ -360,15 +370,15 @@ public class LogUtil
         case VERBOSE:
             return "VERBOSE";
         case DEBUG:
-            return "DEBUG  ";
+            return "DEBUG";
         case INFO:
-            return "INFO   ";
+            return "INFO";
         case WARN:
-            return "WARN   ";
+            return "WARN";
         case ERROR:
-            return "ERROR  ";
+            return "ERROR";
         default:
-            return "";
+            return "UNKNOWN";
         }
     }
 
@@ -490,5 +500,16 @@ public class LogUtil
         {
             return "";
         }
+    }
+
+    /** 获取输出到文件中的日志内容 **/
+    private static String getFileLogContent(int level, String tag, String msg)
+    {
+        String timeDesc = getCurrentTimeDesc();
+        String levelDesc = getLogLevelDesc(level);
+        String pid = String.format("%05d", Process.myPid());
+        String tid = String.format("%05d", Process.myTid());
+        String content = String.format("%s | %s-%s | %s | %s | %s", timeDesc, pid, tid, levelDesc, tag, msg);
+        return content;
     }
 }
