@@ -298,7 +298,7 @@ public class LogUtil
         // 输出日志到文件
         if (isFileLogLevelEnabled(level))
         {
-            addLogToQueue(getFileLogContent(level, tag, msg));
+            addLogToQueue(buildLogContent(level, tag, msg));
         }
     }
 
@@ -326,8 +326,8 @@ public class LogUtil
                 break;
             }
             // 输出到文件中
-            addLogToQueue(getFileLogContent(level, tag, msg));
-            addLogToQueue(getFileLogContent(level, tag, Log.getStackTraceString(tr)));
+            addLogToQueue(buildLogContent(level, tag, msg));
+            addLogToQueue(buildLogContent(level, tag, Log.getStackTraceString(tr)));
         }
     }
 
@@ -503,7 +503,7 @@ public class LogUtil
     }
 
     /** 获取输出到文件中的日志内容 **/
-    private static String getFileLogContent(int level, String tag, String msg)
+    private static String buildLogContent(int level, String tag, String msg)
     {
         String timeDesc = getCurrentTimeDesc();
         String levelDesc = getLogLevelDesc(level);
